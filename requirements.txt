@@ -1,8 +1,0 @@
-# Transcripción con Whisper
-# Para GPU CUDA: instala antes ctranslate2 con soporte CUDA si lo necesitas
-faster-whisper>=1.0.0
-
-# Resumen del texto transcrito
-pysummarization>=1.1.0
-sumy>=0.11.0
-openai>=1.0.0

@@ -28,6 +28,10 @@ dependencies = [
     "openai>=1.0.0",
 ]
 
+[project.urls]
+Repository = "https://github.com/pablogventura/transcriber"
+Homepage = "https://github.com/pablogventura/transcriber"
+
 [project.scripts]
 transcriber = "transcriber.cli:main"
 
