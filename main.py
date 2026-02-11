@@ -146,6 +146,40 @@ def resumir_texto_openai(
         return ""
 
 
+def responder_texto_openai(
+    texto: str,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    model: str | None = None,
+    idioma_detectado: str | None = None,
+) -> str:
+    """Genera una respuesta corta al mensaje usando la API OpenAI."""
+    if not texto or not texto.strip():
+        return ""
+    cfg = _cargar_config_openai()
+    key = api_key or cfg["api_key"]
+    if not key:
+        return ""
+    base = base_url or cfg["base_url"]
+    model_name = model or cfg["model"]
+    client = OpenAI(api_key=key, base_url=base)
+    idioma_inst = f" Responde en {idioma_detectado}." if idioma_detectado else ""
+    system = f"Responde de forma breve al siguiente mensaje.{idioma_inst} Sé directo y conciso."
+    try:
+        resp = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": texto.strip()},
+            ],
+            temperature=0.3,
+        )
+        content = resp.choices[0].message.content
+        return (content or "").strip()
+    except Exception:
+        return ""
+
+
 def main():
     parser = argparse.ArgumentParser(description="Transcribe audio con Whisper.")
     parser.add_argument(
@@ -178,7 +212,12 @@ def main():
     parser.add_argument(
         "--resumen-openai",
         action="store_true",
-        help="Imprimir un resumen con la API OpenAI (Ollama/CCAD). Requiere OPENAI_API_KEY.",
+        help="Imprimir un resumen con la API OpenAI (Ollama/CCAD). Requiere config.ini o OPENAI_API_KEY.",
+    )
+    parser.add_argument(
+        "--respuesta",
+        action="store_true",
+        help="Generar una respuesta corta al mensaje transcrito con OpenAI.",
     )
     args = parser.parse_args()
 
@@ -274,6 +313,23 @@ def main():
                 print(resumen)
             else:
                 print("(No se pudo generar resumen con OpenAI)")
+
+    if args.respuesta and texto_completo:
+        cfg = _cargar_config_openai()
+        if not cfg["api_key"]:
+            print(
+                "Error: --respuesta requiere api_key en config.ini (sección [openai]) "
+                "o la variable de entorno OPENAI_API_KEY."
+            )
+        else:
+            respuesta = responder_texto_openai(
+                texto_completo, idioma_detectado=idioma_prompt
+            )
+            if respuesta:
+                print("--- Respuesta ---")
+                print(respuesta)
+            else:
+                print("(No se pudo generar respuesta con OpenAI)")
 
 
 if __name__ == "__main__":
