@@ -120,9 +120,8 @@ def main():
     parser = argparse.ArgumentParser(description="Transcribe audio con Whisper.")
     parser.add_argument(
         "audio",
-        nargs="?",
-        default="test.ogg",
-        help="Archivo de audio a transcribir (por defecto: test.ogg)",
+        metavar="ARCHIVO",
+        help="Archivo de audio a transcribir (ej. grabacion.mp3, entrada.ogg)",
     )
     parser.add_argument(
         "--resumen",
