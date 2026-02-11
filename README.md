@@ -54,20 +54,22 @@ Examples:
 
 ```bash
 summscriber recording.mp3
-summscriber interview.ogg --summary
-summscriber audio.wav --summary --reply --json
+summscriber interview.ogg --reply
+summscriber audio.wav --reply --json
+summscriber audio.wav --no-summary
 ```
 
 ### Main options
 
 - **FILE**: audio file to transcribe (required).
-- `--summary`: summarize (OpenAI if token works; otherwise shortest of pysummarization and sumy).
-- `--summary-pysummarization` / `--summary-sumy` / `--summary-openai`: use a specific summarization backend.
+- Summarization is **on by default**: OpenAI if configured, otherwise the shortest of pysummarization and sumy.
+- `--no-summary`: do not generate a summary (transcription only, or with `--reply`/`--json` if you pass those).
+- `--summary-pysummarization` / `--summary-sumy` / `--summary-openai`: also print a summary from a specific backend.
 - `--summary-sentences N`: number of sentences in the summary (default 3).
 - `--reply`: generate a short reply to the message with OpenAI.
 - `--json`: output as JSON.
 
-For summarization and reply with OpenAI, use `config.ini` (section `[openai]`) or environment variables `OPENAI_API_KEY` and optionally `OPENAI_BASE_URL`. See `config.ini.example`. You can save your token and URL with:
+For summarization and reply with OpenAI, use a config file or environment variables. Configuration is read from the current directory, then from the user config dir (`~/.config/summscriber/config.ini` on Linux/macOS, `%APPDATA%\summscriber\config.ini` on Windows). See `config.ini.example`. Save your token and URL once (stored in the user config dir so it works from any directory):
 
 ```bash
 summscriber --save-config --api-key YOUR_TOKEN --base-url https://...
