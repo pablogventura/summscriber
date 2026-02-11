@@ -1,5 +1,6 @@
 import argparse
 import configparser
+import json
 import os
 from pathlib import Path
 
@@ -219,6 +220,11 @@ def main():
         action="store_true",
         help="Generar una respuesta corta al mensaje transcrito con OpenAI.",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emitir la salida en JSON (texto, idioma, resumen y/o respuesta según opciones).",
+    )
     args = parser.parse_args()
 
     # Detectar si hay GPU disponible
@@ -230,10 +236,11 @@ def main():
 
     if use_cuda:
         device, compute_type = "cuda", "float16"
-        print("Usando GPU (CUDA)")
     else:
         device, compute_type = "cpu", "int8"
-        print("Usando CPU")
+
+    if not args.json:
+        print("Usando GPU (CUDA)" if use_cuda else "Usando CPU")
 
     model = WhisperModel("large-v3", device=device, compute_type=compute_type)
     segments, info = model.transcribe(args.audio)
@@ -244,9 +251,16 @@ def main():
     idioma_prompt = _idioma_nombre_para_prompt(idioma_codigo)
 
     texto_completo = " ".join(s.text for s in segments).strip()
-    print(texto_completo)
-    if texto_completo:
-        print()
+
+    salida = {}
+    if args.json:
+        salida["texto"] = texto_completo
+        salida["idioma"] = idioma_codigo
+        salida["dispositivo"] = "cuda" if use_cuda else "cpu"
+    else:
+        print(texto_completo)
+        if texto_completo:
+            print()
 
     n = args.resumen_oraciones
 
@@ -258,8 +272,12 @@ def main():
                 texto_completo, num_oraciones=n, idioma_detectado=idioma_prompt
             )
         if resumen_openai:
-            print("--- Resumen (openai) ---")
-            print(resumen_openai)
+            if args.json:
+                salida["resumen"] = resumen_openai
+                salida["resumen_origen"] = "openai"
+            else:
+                print("--- Resumen (openai) ---")
+                print(resumen_openai)
         else:
             # Sin token o OpenAI no respondió: usar pysummarization y sumy, elegir el más corto
             resumen_py = resumir_texto(texto_completo, num_oraciones=n)
@@ -274,17 +292,24 @@ def main():
             if candidatos:
                 mas_corto = min(candidatos, key=lambda x: len(x[0]))
                 texto_resumen, nombre = mas_corto
-                print(f"--- Resumen ({nombre}, el más corto) ---")
-                print(texto_resumen)
-            else:
+                if args.json:
+                    salida["resumen"] = texto_resumen
+                    salida["resumen_origen"] = nombre
+                else:
+                    print(f"--- Resumen ({nombre}, el más corto) ---")
+                    print(texto_resumen)
+            elif not args.json:
                 print("(Texto demasiado corto para generar resumen)")
 
     if args.resumen_pysummarization and texto_completo:
         resumen = resumir_texto(texto_completo, num_oraciones=n)
         if resumen:
-            print("--- Resumen (pysummarization) ---")
-            print(resumen)
-        else:
+            if args.json:
+                salida["resumen_pysummarization"] = resumen
+            else:
+                print("--- Resumen (pysummarization) ---")
+                print(resumen)
+        elif not args.json:
             print("(Texto demasiado corto para generar resumen)")
 
     if args.resumen_sumy and texto_completo:
@@ -292,44 +317,62 @@ def main():
             texto_completo, num_oraciones=n, idioma=sumy_idioma
         )
         if resumen:
-            print("--- Resumen (sumy) ---")
-            print(resumen)
-        else:
+            if args.json:
+                salida["resumen_sumy"] = resumen
+            else:
+                print("--- Resumen (sumy) ---")
+                print(resumen)
+        elif not args.json:
             print("(Texto demasiado corto para generar resumen con sumy)")
 
     if args.resumen_openai and texto_completo:
         cfg = _cargar_config_openai()
         if not cfg["api_key"]:
-            print(
-                "Error: --resumen-openai requiere api_key en config.ini (sección [openai]) "
-                "o la variable de entorno OPENAI_API_KEY."
-            )
+            if not args.json:
+                print(
+                    "Error: --resumen-openai requiere api_key en config.ini (sección [openai]) "
+                    "o la variable de entorno OPENAI_API_KEY."
+                )
+            else:
+                salida["error_resumen_openai"] = "Falta api_key en config.ini o OPENAI_API_KEY"
         else:
             resumen = resumir_texto_openai(
                 texto_completo, num_oraciones=n, idioma_detectado=idioma_prompt
             )
             if resumen:
-                print("--- Resumen (openai) ---")
-                print(resumen)
-            else:
+                if args.json:
+                    salida["resumen_openai"] = resumen
+                else:
+                    print("--- Resumen (openai) ---")
+                    print(resumen)
+            elif not args.json:
                 print("(No se pudo generar resumen con OpenAI)")
 
     if args.respuesta and texto_completo:
         cfg = _cargar_config_openai()
         if not cfg["api_key"]:
-            print(
-                "Error: --respuesta requiere api_key en config.ini (sección [openai]) "
-                "o la variable de entorno OPENAI_API_KEY."
-            )
+            if not args.json:
+                print(
+                    "Error: --respuesta requiere api_key en config.ini (sección [openai]) "
+                    "o la variable de entorno OPENAI_API_KEY."
+                )
+            else:
+                salida["error_respuesta"] = "Falta api_key en config.ini o OPENAI_API_KEY"
         else:
             respuesta = responder_texto_openai(
                 texto_completo, idioma_detectado=idioma_prompt
             )
             if respuesta:
-                print("--- Respuesta ---")
-                print(respuesta)
-            else:
+                if args.json:
+                    salida["respuesta"] = respuesta
+                else:
+                    print("--- Respuesta ---")
+                    print(respuesta)
+            elif not args.json:
                 print("(No se pudo generar respuesta con OpenAI)")
+
+    if args.json:
+        print(json.dumps(salida, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
