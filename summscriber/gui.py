@@ -11,6 +11,7 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 
 from summscriber.cli import run_pipeline
+from summscriber.i18n import _
 
 
 def _maximize_window(window: tk.Tk) -> None:
@@ -81,10 +82,10 @@ def _insert_markdown(text_widget: tk.Text, md: str) -> None:
 def main() -> None:
     audio_path = (sys.argv[1:] or [None])[0]
     if not audio_path or not audio_path.strip():
-        print("Usage: summscriber-gui FILE", file=sys.stderr)
+        print(_("usage"), file=sys.stderr)
         sys.exit(1)
 
-    print("Running...", flush=True)
+    print(_("running"), flush=True)
     try:
         result = run_pipeline(audio_path.strip(), num_sentences=3, include_reply=True)
         err = None
@@ -120,10 +121,10 @@ def main() -> None:
     radio_frame = ttk.Frame(main_frame)
     radio_frame.grid(row=0, column=0, sticky=tk.W, pady=(0, 4))
     ttk.Radiobutton(
-        radio_frame, text="Summary", variable=view_var, value="summary", command=_update_summary_view
+        radio_frame, text=_("summary"), variable=view_var, value="summary", command=_update_summary_view
     ).pack(side=tk.LEFT)
     ttk.Radiobutton(
-        radio_frame, text="Original text", variable=view_var, value="original", command=_update_summary_view
+        radio_frame, text=_("original_text"), variable=view_var, value="original", command=_update_summary_view
     ).pack(side=tk.LEFT, padx=(12, 0))
 
     summary_text = scrolledtext.ScrolledText(
@@ -152,11 +153,11 @@ def main() -> None:
         menu = tk.Menu(reply_text, tearoff=0)
         if has_selection:
             menu.add_command(
-                label="Copy selection",
+                label=_("copy_selection"),
                 command=lambda: _copy_selection_to_clipboard(reply_text, root),
             )
         menu.add_command(
-            label="Copy all",
+            label=_("copy_all"),
             command=lambda: _copy_all_reply_to_clipboard(reply_text, root),
         )
         menu.tk_popup(event.x_root, event.y_root)
@@ -191,7 +192,7 @@ def main() -> None:
         reply_text.delete("1.0", tk.END)
         reply_text.insert(tk.END, content or "")
 
-    ttk.Label(main_frame, text="Reply").grid(row=2, column=0, sticky=tk.W)
+    ttk.Label(main_frame, text=_("reply")).grid(row=2, column=0, sticky=tk.W)
     reply_text.grid(row=3, column=0, sticky=tk.NSEW, pady=(0, 8))
 
     if err:
@@ -199,7 +200,7 @@ def main() -> None:
         full_text_content = ""
         _update_summary_view()
         _set_reply("")
-        messagebox.showerror("Error", err, parent=root)
+        messagebox.showerror(_("error"), err, parent=root)
     else:
         summary_content = result.get("summary", "")
         full_text_content = result.get("text", "")
