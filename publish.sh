@@ -18,4 +18,15 @@ python -m build
 echo "Uploading to PyPI..."
 twine upload dist/*
 
+VERSION=$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml)
+if [ -z "$VERSION" ]; then
+  echo "Could not read version from pyproject.toml"
+  exit 1
+fi
+TAG="v${VERSION}"
+echo "Creating tag ${TAG}..."
+git tag "$TAG"
+echo "Pushing tag ${TAG}..."
+git push origin "$TAG"
+
 echo "Done. Check https://pypi.org/project/summscriber/"
