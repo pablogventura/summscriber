@@ -120,10 +120,10 @@ def main() -> None:
     radio_frame = ttk.Frame(main_frame)
     radio_frame.grid(row=0, column=0, sticky=tk.W, pady=(0, 4))
     ttk.Radiobutton(
-        radio_frame, text="Resumen", variable=view_var, value="summary", command=_update_summary_view
+        radio_frame, text="Summary", variable=view_var, value="summary", command=_update_summary_view
     ).pack(side=tk.LEFT)
     ttk.Radiobutton(
-        radio_frame, text="Texto original", variable=view_var, value="original", command=_update_summary_view
+        radio_frame, text="Original text", variable=view_var, value="original", command=_update_summary_view
     ).pack(side=tk.LEFT, padx=(12, 0))
 
     summary_text = scrolledtext.ScrolledText(
@@ -152,11 +152,11 @@ def main() -> None:
         menu = tk.Menu(reply_text, tearoff=0)
         if has_selection:
             menu.add_command(
-                label="Copiar selección",
+                label="Copy selection",
                 command=lambda: _copy_selection_to_clipboard(reply_text, root),
             )
         menu.add_command(
-            label="Copiar todo",
+            label="Copy all",
             command=lambda: _copy_all_reply_to_clipboard(reply_text, root),
         )
         menu.tk_popup(event.x_root, event.y_root)
