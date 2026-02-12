@@ -34,6 +34,7 @@ Homepage = "https://github.com/pablogventura/summscriber"
 
 [project.scripts]
 summscriber = "summscriber.cli:main"
+summscriber-gui = "summscriber.gui:main"
 
 [project.optional-dependencies]
 dev = [

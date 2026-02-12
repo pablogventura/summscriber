@@ -156,7 +156,7 @@ def summarize_text_openai(
     model_name = model or cfg["model"]
     client = OpenAI(api_key=key, base_url=base)
     lang_inst = f" The text is in {detected_language}." if detected_language else ""
-    system = f"Summarize the text in a technical and concise way in approximately {num_sentences} sentences.{lang_inst} Use structure and hierarchy (e.g. lists) when possible. Summarize in the same language as the text."
+    system = f"Summarize the text in a technical, concise and short way.{lang_inst} Structure the response clearly: use hierarchy (e.g. headings, bullet or numbered lists) when appropriate. Summarize in the same language as the text."
     try:
         resp = client.chat.completions.create(
             model=model_name,
@@ -189,7 +189,7 @@ def reply_text_openai(
     model_name = model or cfg["model"]
     client = OpenAI(api_key=key, base_url=base)
     lang_inst = f" Reply in {detected_language}." if detected_language else ""
-    system = f"Reply briefly to the following message.{lang_inst} Be direct and concise."
+    system = f"Reply briefly to the following message.{lang_inst} Be direct and concise. Write in a very natural, informal way, as if you were sending a WhatsApp message—no bullet points, no structure, just plain natural text."
     try:
         resp = client.chat.completions.create(
             model=model_name,
@@ -203,6 +203,58 @@ def reply_text_openai(
         return (content or "").strip()
     except Exception:
         return ""
+
+
+def run_pipeline(
+    audio_path: str,
+    num_sentences: int = 3,
+    include_reply: bool = True,
+) -> dict:
+    """
+    Transcribe audio, compute summary (default logic), and optionally reply.
+    Returns dict with keys: text, language, summary, reply (values may be empty).
+    """
+    try:
+        gpu_count = ctranslate2.get_cuda_device_count()
+        use_cuda = gpu_count > 0
+    except Exception:
+        use_cuda = False
+    device, compute_type = ("cuda", "float16") if use_cuda else ("cpu", "int8")
+    model = WhisperModel("large-v3", device=device, compute_type=compute_type)
+    segments, info = model.transcribe(audio_path)
+    language_code = getattr(info, "language", None) or ""
+    sumy_language = _language_to_sumy(language_code)
+    language_for_prompt = _language_name_for_prompt(language_code)
+    full_text = " ".join(s.text for s in segments).strip()
+
+    out = {"text": full_text, "language": language_code, "summary": "", "reply": ""}
+    if not full_text:
+        return out
+
+    cfg = _load_openai_config()
+    summary_openai = ""
+    if cfg["api_key"]:
+        summary_openai = summarize_text_openai(
+            full_text, num_sentences=num_sentences, detected_language=language_for_prompt
+        )
+    if summary_openai:
+        out["summary"] = summary_openai
+    else:
+        summary_py = summarize_text(full_text, num_sentences=num_sentences)
+        summary_sumy = summarize_text_sumy(
+            full_text, num_sentences=num_sentences, language=sumy_language
+        )
+        candidates = [(summary_py, "pysummarization"), (summary_sumy, "sumy")]
+        candidates = [(t, n) for t, n in candidates if t]
+        if candidates:
+            out["summary"] = min(candidates, key=lambda x: len(x[0]))[0]
+
+    if include_reply and cfg["api_key"] and full_text:
+        out["reply"] = reply_text_openai(
+            full_text, detected_language=language_for_prompt
+        ) or ""
+
+    return out
 
 
 def main():
