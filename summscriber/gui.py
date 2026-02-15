@@ -11,7 +11,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 
-from summscriber.cli import transcribe_audio, compute_summary_and_reply, get_fallback_summary
+from summscriber.cli import transcribe_audio, compute_summary_and_reply, get_text_with_highlighted_keywords
 from summscriber.i18n import _
 
 
@@ -263,11 +263,9 @@ def main() -> None:
         messagebox.showerror(_("error"), err, parent=root)
     else:
         full_text_content = trans.get("text", "")
-        summary_content = get_fallback_summary(
-            full_text_content, trans.get("language", ""), num_sentences=3
+        summary_content = get_text_with_highlighted_keywords(
+            full_text_content, trans.get("language", ""), top_n=15
         )
-        if not summary_content:
-            view_var.set("original")
         _update_summary_view()
         _set_reply(_("loading"))
         root.update_idletasks()

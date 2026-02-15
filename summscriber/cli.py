@@ -4,6 +4,7 @@ import argparse
 import configparser
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -218,6 +219,42 @@ def transcribe_audio(audio_path: str) -> dict:
     language_code = getattr(info, "language", None) or ""
     full_text = " ".join(s.text for s in segments).strip()
     return {"text": full_text, "language": language_code}
+
+
+def get_text_with_highlighted_keywords(
+    full_text: str,
+    language_code: str,
+    top_n: int = 15,
+) -> str:
+    """Return full text with keywords highlighted in **bold** (markdown) using rake-nltk."""
+    if not full_text or not full_text.strip():
+        return ""
+    try:
+        from rake_nltk import Rake
+        import nltk
+        try:
+            nltk.download("stopwords", quiet=True)
+        except Exception:
+            pass
+    except ImportError:
+        return full_text
+    try:
+        rake_lang = _language_to_sumy(language_code)
+        r = Rake(language=rake_lang)
+        r.extract_keywords_from_text(full_text.strip())
+        phrases = r.get_ranked_phrases()[:top_n]
+        if not phrases:
+            return full_text
+        phrases = sorted(set(p.strip() for p in phrases if len(p.strip()) > 1), key=len, reverse=True)
+        result = full_text
+        for phrase in phrases:
+            if not phrase or phrase in ("**",):
+                continue
+            escaped = re.escape(phrase)
+            result = re.sub(r"(?<!\*)\b" + escaped + r"\b(?!\*)", r"**\g<0>**", result)
+        return result
+    except Exception:
+        return full_text
 
 
 def get_fallback_summary(
