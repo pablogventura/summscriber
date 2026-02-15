@@ -7,10 +7,11 @@ Usage: summscriber-gui FILE
 """
 import re
 import sys
+import threading
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 
-from summscriber.cli import run_pipeline
+from summscriber.cli import transcribe_audio, compute_summary_and_reply, get_fallback_summary
 from summscriber.i18n import _
 
 
@@ -87,10 +88,10 @@ def main() -> None:
 
     print(_("running"), flush=True)
     try:
-        result = run_pipeline(audio_path.strip(), num_sentences=3, include_reply=True)
+        trans = transcribe_audio(audio_path.strip())
         err = None
     except Exception as e:
-        result = None
+        trans = None
         err = str(e)
 
     root = tk.Tk()
@@ -105,7 +106,7 @@ def main() -> None:
     main_frame.grid_rowconfigure(3, weight=1)
     main_frame.grid_columnconfigure(0, weight=1)
 
-    view_var = tk.StringVar(value="summary")
+    view_var = tk.StringVar(value="original")
     summary_content = ""
     full_text_content = ""
 
@@ -217,6 +218,43 @@ def main() -> None:
     ttk.Label(main_frame, text=_("reply")).grid(row=2, column=0, sticky=tk.W)
     reply_text.grid(row=3, column=0, sticky=tk.NSEW, pady=(0, 8))
 
+    cancelled = [False]
+
+    def _on_close() -> None:
+        cancelled[0] = True
+        root.destroy()
+
+    def _apply_summary_reply(sr: dict) -> None:
+        if cancelled[0]:
+            return
+        nonlocal summary_content
+        summary_content = sr.get("summary", "")
+        _update_summary_view()
+        reply = sr.get("reply", "")
+        _set_reply(reply)
+        if reply:
+            root.clipboard_clear()
+            root.clipboard_append(reply)
+            root.update()
+
+    def _fetch_summary_reply() -> None:
+        try:
+            sr = compute_summary_and_reply(
+                full_text_content,
+                trans.get("language", ""),
+                num_sentences=3,
+                include_reply=True,
+            )
+            if cancelled[0]:
+                return
+            root.after(0, lambda: _apply_summary_reply(sr))
+        except Exception as e:
+            if cancelled[0]:
+                return
+            root.after(0, lambda: messagebox.showerror(_("error"), str(e), parent=root))
+
+    root.protocol("WM_DELETE_WINDOW", _on_close)
+
     if err:
         summary_content = ""
         full_text_content = ""
@@ -224,15 +262,13 @@ def main() -> None:
         _set_reply("")
         messagebox.showerror(_("error"), err, parent=root)
     else:
-        summary_content = result.get("summary", "")
-        full_text_content = result.get("text", "")
+        full_text_content = trans.get("text", "")
+        summary_content = get_fallback_summary(
+            full_text_content, trans.get("language", ""), num_sentences=3
+        )
         _update_summary_view()
-        reply = result.get("reply", "")
-        _set_reply(reply)
-        if reply:
-            root.clipboard_clear()
-            root.clipboard_append(reply)
-            root.update()
+        _set_reply(_("loading"))
+        threading.Thread(target=_fetch_summary_reply, daemon=True).start()
 
     root.mainloop()
 

@@ -205,15 +205,8 @@ def reply_text_openai(
         return ""
 
 
-def run_pipeline(
-    audio_path: str,
-    num_sentences: int = 3,
-    include_reply: bool = True,
-) -> dict:
-    """
-    Transcribe audio, compute summary (default logic), and optionally reply.
-    Returns dict with keys: text, language, summary, reply (values may be empty).
-    """
+def transcribe_audio(audio_path: str) -> dict:
+    """Transcribe audio only. Returns dict with keys: text, language (values may be empty)."""
     try:
         gpu_count = ctranslate2.get_cuda_device_count()
         use_cuda = gpu_count > 0
@@ -223,14 +216,44 @@ def run_pipeline(
     model = WhisperModel("large-v3", device=device, compute_type=compute_type)
     segments, info = model.transcribe(audio_path)
     language_code = getattr(info, "language", None) or ""
-    sumy_language = _language_to_sumy(language_code)
-    language_for_prompt = _language_name_for_prompt(language_code)
     full_text = " ".join(s.text for s in segments).strip()
+    return {"text": full_text, "language": language_code}
 
-    out = {"text": full_text, "language": language_code, "summary": "", "reply": ""}
-    if not full_text:
+
+def get_fallback_summary(
+    full_text: str,
+    language_code: str,
+    num_sentences: int = 3,
+) -> str:
+    """Summary using only pysummarization/sumy (no OpenAI). For showing while OpenAI loads."""
+    if not full_text or not full_text.strip():
+        return ""
+    sumy_language = _language_to_sumy(language_code)
+    summary_py = summarize_text(full_text, num_sentences=num_sentences)
+    summary_sumy = summarize_text_sumy(
+        full_text, num_sentences=num_sentences, language=sumy_language
+    )
+    candidates = [(summary_py, "pysummarization"), (summary_sumy, "sumy")]
+    candidates = [(t, n) for t, n in candidates if t]
+    return min(candidates, key=lambda x: len(x[0]))[0] if candidates else ""
+
+
+def compute_summary_and_reply(
+    full_text: str,
+    language_code: str,
+    num_sentences: int = 3,
+    include_reply: bool = True,
+) -> dict:
+    """
+    Compute summary and reply from transcribed text.
+    Returns dict with keys: summary, reply (values may be empty).
+    """
+    out = {"summary": "", "reply": ""}
+    if not full_text or not full_text.strip():
         return out
 
+    sumy_language = _language_to_sumy(language_code)
+    language_for_prompt = _language_name_for_prompt(language_code)
     cfg = _load_openai_config()
     summary_openai = ""
     if cfg["api_key"]:
@@ -254,6 +277,30 @@ def run_pipeline(
             full_text, detected_language=language_for_prompt
         ) or ""
 
+    return out
+
+
+def run_pipeline(
+    audio_path: str,
+    num_sentences: int = 3,
+    include_reply: bool = True,
+) -> dict:
+    """
+    Transcribe audio, compute summary (default logic), and optionally reply.
+    Returns dict with keys: text, language, summary, reply (values may be empty).
+    """
+    trans = transcribe_audio(audio_path)
+    full_text = trans["text"]
+    language_code = trans["language"]
+    out = {"text": full_text, "language": language_code, "summary": "", "reply": ""}
+    if not full_text:
+        return out
+    sr = compute_summary_and_reply(
+        full_text, language_code,
+        num_sentences=num_sentences, include_reply=include_reply,
+    )
+    out["summary"] = sr["summary"]
+    out["reply"] = sr["reply"]
     return out
 
 

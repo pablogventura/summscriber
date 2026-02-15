@@ -16,6 +16,7 @@ MESSAGES = {
         "error": "Error",
         "usage": "Usage: summscriber-gui FILE",
         "running": "Running...",
+        "loading": "Loading...",
     },
     "es": {
         "summary": "Resumen",
@@ -26,6 +27,7 @@ MESSAGES = {
         "error": "Error",
         "usage": "Uso: summscriber-gui ARCHIVO",
         "running": "Ejecutando...",
+        "loading": "Cargando...",
     },
     "pt": {
         "summary": "Resumo",
@@ -36,6 +38,7 @@ MESSAGES = {
         "error": "Erro",
         "usage": "Uso: summscriber-gui ARQUIVO",
         "running": "Executando...",
+        "loading": "Carregando...",
     },
 }
 
